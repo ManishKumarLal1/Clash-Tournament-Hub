@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0A0A0F;
+  --text: #F5F5F7;
+  --gold: #E8B65A;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  /* This makes Lenis smooth scroll work perfectly */
+  overflow-x: hidden; 
+}
+
+/* Cinematic Film Grain / Noise */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  pointer-events: none;
+  background-image: url('/images/noise.jpg');
+  opacity: 0.04;
+  z-index: 9999;
+  mix-blend-mode: overlay;
+}
