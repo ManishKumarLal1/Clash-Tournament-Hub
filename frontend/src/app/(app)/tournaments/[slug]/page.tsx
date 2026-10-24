@@ -1,10 +1,11 @@
 import { notFound } from 'next/navigation';
 import { MOCK_TOURNAMENTS } from '@/lib/mock/tournaments';
 import { TextReveal } from '@/components/animations/text-reveal';
-import { ScrollReveal } from '@/components/animations/scroll-reveal'; // We'll create this next
-import { Magnetic } from '@/components/animations/magnetic';
+import { ScrollReveal } from '@/components/animations/scroll-reveal';
 import { Trophy, Users, Shield, Calendar, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { TournamentActions } from '@/components/tournament/tournament-actions';
+import { BracketView } from '@/components/tournament/bracket-view';
 
 export default async function TournamentDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   // Next.js 15 requires awaiting params
@@ -39,7 +40,7 @@ export default async function TournamentDetailPage({ params }: { params: Promise
         </TextReveal>
 
         <div className="flex flex-col md:flex-row gap-6 md:items-center justify-between p-6 bg-[#12121A] border border-white/5 rounded-2xl">
-          <div className="flex gap-8">
+          <div className="flex flex-wrap gap-6 md:gap-8">
             <div>
               <p className="text-xs text-[#A1A1AA] mb-1">Prize Pool</p>
               <p className="text-xl font-medium text-gold flex items-center gap-2">
@@ -60,11 +61,9 @@ export default async function TournamentDetailPage({ params }: { params: Promise
             </div>
           </div>
 
-          <Magnetic>
-            <button className="w-full md:w-auto px-8 py-4 bg-gold text-black font-medium rounded-xl hover:scale-105 transition-transform duration-300">
-              Join Tournament
-            </button>
-          </Magnetic>
+          {/* Our new Client Component */}
+          <TournamentActions />
+          
         </div>
       </div>
 
@@ -77,6 +76,7 @@ export default async function TournamentDetailPage({ params }: { params: Promise
             <p>• Best of 1 (BO1) single elimination.</p>
             <p>• Friendly wars must be started within 15 minutes of the scheduled time.</p>
             <p>• Screenshots of the result must be posted in the chat.</p>
+            <p>• <strong className="text-white">Host controls results:</strong> The tournament host acts as the referee and manually updates the bracket winners.</p>
           </div>
         </div>
 
@@ -87,7 +87,6 @@ export default async function TournamentDetailPage({ params }: { params: Promise
             <span className="text-sm text-[#A1A1AA]">{tournament.currentPlayers}/{tournament.maxPlayers} Joined</span>
           </div>
           
-          {/* We'll make a simple grid for now */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {Array.from({ length: tournament.currentPlayers }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 bg-[#12121A] border border-white/5 p-3 rounded-xl">
@@ -102,6 +101,9 @@ export default async function TournamentDetailPage({ params }: { params: Promise
             ))}
           </div>
         </div>
+      </div>
+      <div className="mt-16 border-t border-white/10 pt-16">
+        <BracketView />
       </div>
     </main>
   );
