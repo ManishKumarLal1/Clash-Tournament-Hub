@@ -8,14 +8,14 @@ import { Magnetic } from '@/components/animations/magnetic';
 import { Search, UserPlus, Check, X, Swords } from 'lucide-react';
 
 const MOCK_REQUESTS = [
-  { id: '1', name: 'BarbarianKing', tag: '#8YV2QLP', th: 16 },
-  { id: '2', name: 'ArcherQueen', tag: '#2PQL8YR', th: 15 },
+  { id: '1', username: '@barbarian_king', name: 'Barbarian King' },
+  { id: '2', username: '@archer_queen', name: 'Archer Queen' },
 ];
 
 const MOCK_FRIENDS = [
-  { id: '1', name: 'ClashKing', tag: '#9XYZ123', th: 16, status: 'In Tournament' },
-  { id: '2', name: 'WarLord', tag: '#7ABC456', th: 16, status: 'Online' },
-  { id: '3', name: 'NightOwl', tag: '#3DEF789', th: 15, status: 'Offline' },
+  { id: '1', username: '@clashking', name: 'ClashKing', status: 'In Tournament' },
+  { id: '2', username: '@warlord', name: 'WarLord', status: 'Online' },
+  { id: '3', username: '@nightowl', name: 'NightOwl', status: 'Offline' },
 ];
 
 export default function FriendsPage() {
@@ -40,7 +40,7 @@ export default function FriendsPage() {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A1A1AA]" />
             <input 
               type="text" 
-              placeholder="Search by name or #tag"
+              placeholder="Search by @username"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#12121A] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/50 transition-all"
@@ -65,7 +65,7 @@ export default function FriendsPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-white">{req.name}</p>
-                    <p className="text-xs text-[#A1A1AA] font-mono">{req.tag} • TH{req.th}</p>
+                    <p className="text-xs text-[#A1A1AA] font-mono">{req.username}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -102,7 +102,7 @@ export default function FriendsPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-white group-hover:text-gold transition-colors">{friend.name}</p>
-                    <p className="text-xs text-[#A1A1AA] font-mono">{friend.tag}</p>
+                    <p className="text-xs text-[#A1A1AA] font-mono">{friend.username}</p>
                   </div>
                 </div>
                 <div className="text-right">

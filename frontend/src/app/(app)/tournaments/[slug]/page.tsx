@@ -1,14 +1,13 @@
 import { notFound } from 'next/navigation';
 import { MOCK_TOURNAMENTS } from '@/lib/mock/tournaments';
 import { TextReveal } from '@/components/animations/text-reveal';
-import { ScrollReveal } from '@/components/animations/scroll-reveal';
 import { Trophy, Users, Shield, Calendar, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { TournamentActions } from '@/components/tournament/tournament-actions';
 import { BracketView } from '@/components/tournament/bracket-view';
+import { CopyCode } from '@/components/tournament/copy-code'; // <-- NEW IMPORT
 
 export default async function TournamentDetailPage({ params }: { params: Promise<{ slug: string }> }) {
-  // Next.js 15 requires awaiting params
   const { slug } = await params;
   
   const tournament = MOCK_TOURNAMENTS.find((t) => t.slug === slug);
@@ -35,9 +34,16 @@ export default async function TournamentDetailPage({ params }: { params: Promise
           <span className="text-[#A1A1AA] text-sm">Hosted by {tournament.host}</span>
         </div>
         
-        <TextReveal as="h1" className="font-display text-5xl md:text-7xl font-bold text-white mb-6">
+        <TextReveal as="h1" className="font-display text-5xl md:text-7xl font-bold text-white mb-2">
           {tournament.title}
         </TextReveal>
+
+        {/* JOIN CODE SECTION */}
+        <div className="flex items-center gap-2 mb-6">
+          <span className="text-sm text-[#A1A1AA]">Join Code:</span>
+          {/* Use the new Client Component here */}
+          <CopyCode code={tournament.joinCode || 'NO-CODE'} />
+        </div>
 
         <div className="flex flex-col md:flex-row gap-6 md:items-center justify-between p-6 bg-[#12121A] border border-white/5 rounded-2xl">
           <div className="flex flex-wrap gap-6 md:gap-8">
@@ -61,9 +67,7 @@ export default async function TournamentDetailPage({ params }: { params: Promise
             </div>
           </div>
 
-          {/* Our new Client Component */}
-          <TournamentActions />
-          
+          <TournamentActions tournament={tournament} />
         </div>
       </div>
 
@@ -102,6 +106,8 @@ export default async function TournamentDetailPage({ params }: { params: Promise
           </div>
         </div>
       </div>
+      
+      {/* Bracket Section */}
       <div className="mt-16 border-t border-white/10 pt-16">
         <BracketView />
       </div>

@@ -3,6 +3,7 @@ export const MOCK_TOURNAMENTS = [
     id: '1',
     slug: 'th16-masters-1v1',
     title: 'TH16 Masters 1v1',
+    type: '1v1',
     format: 'Single Elimination',
     prize: '5000 Gems',
     maxPlayers: 32,
@@ -10,23 +11,30 @@ export const MOCK_TOURNAMENTS = [
     status: 'Registering',
     startDate: 'Oct 28, 2026',
     host: 'ClashKing',
+    joinCode: 'TH16-X8Y9', // Add this
   },
   {
     id: '2',
-    slug: 'clan-war-league-prep',
-    title: 'CWL Prep Showdown',
-    format: '1v1 Round Robin',
-    prize: '$50 Cash',
+    slug: 'championship-5v5',
+    title: 'Global 5v5 Championship',
+    type: 'clan_vs_clan',
+    format: 'Single Elimination',
+    prize: '$200 Cash',
     maxPlayers: 16,
-    currentPlayers: 16,
-    status: 'Full',
-    startDate: 'Oct 25, 2026',
+    currentPlayers: 12,
+    status: 'Registering',
+    startDate: 'Nov 05, 2026',
     host: 'WarLord',
+    warType: '5v5',
+    battleModifier: 'Esports',
+    thRequirements: ['18', '17', '17', '16', '16'],
+    joinCode: 'CVC5-M4K2', // Add this
   },
   {
     id: '3',
     slug: 'friday-night-fights',
     title: 'Friday Night Fights',
+    type: '1v1',
     format: 'Single Elimination',
     prize: 'Gold Pass',
     maxPlayers: 8,
@@ -34,11 +42,13 @@ export const MOCK_TOURNAMENTS = [
     status: 'Registering',
     startDate: 'Nov 01, 2026',
     host: 'NightOwl',
+    joinCode: 'FNF-99PL', // Add this
   },
   {
     id: '4',
     slug: 'town-hall-15-open',
     title: 'TH15 Open Championship',
+    type: '1v1',
     format: 'Single Elimination',
     prize: '1000 Gems',
     maxPlayers: 64,
@@ -46,5 +56,6 @@ export const MOCK_TOURNAMENTS = [
     status: 'Registering',
     startDate: 'Nov 05, 2026',
     host: 'ProClasher',
+    joinCode: 'TH15-OP3N', // Add this
   }
 ];
