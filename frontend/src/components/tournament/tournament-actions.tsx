@@ -4,10 +4,9 @@ import { useState } from 'react';
 import { Magnetic } from '@/components/animations/magnetic';
 import { TournamentChat } from '@/components/tournament/tournament-chat';
 import { JoinModal } from '@/components/tournament/join-modal';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, CheckCircle } from 'lucide-react';
 
-// Add tournament as a prop so the modal knows what data to load
-export function TournamentActions({ tournament }: { tournament: any }) {
+export function TournamentActions({ tournament, hasJoined }: { tournament: any, hasJoined: boolean }) {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isJoinOpen, setIsJoinOpen] = useState(false);
 
@@ -22,18 +21,32 @@ export function TournamentActions({ tournament }: { tournament: any }) {
           Chat Hub
         </button>
         
-        <Magnetic>
-          <button 
-            onClick={() => setIsJoinOpen(true)}
-            className="w-full sm:w-auto px-8 py-4 bg-gold text-black font-medium rounded-xl hover:scale-105 transition-transform duration-300"
-          >
-            Join Tournament
-          </button>
-        </Magnetic>
+        {hasJoined ? (
+          <div className="w-full sm:w-auto px-8 py-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium rounded-xl flex items-center justify-center gap-2 cursor-not-allowed">
+            <CheckCircle className="w-5 h-5" /> Already Joined
+          </div>
+        ) : (
+          <Magnetic>
+            <button 
+              onClick={() => setIsJoinOpen(true)}
+              className="w-full sm:w-auto px-8 py-4 bg-gold text-black font-medium rounded-xl hover:scale-105 transition-transform duration-300"
+            >
+              Join Tournament
+            </button>
+          </Magnetic>
+        )}
       </div>
 
-      <TournamentChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
-      <JoinModal isOpen={isJoinOpen} onClose={() => setIsJoinOpen(false)} tournament={tournament} />
+      // Find the TournamentChat component at the bottom:
+<TournamentChat 
+  isOpen={isChatOpen} 
+  onClose={() => setIsChatOpen(false)} 
+  tournamentId={tournament.id}
+  title="Tournament Hub Chat" 
+/>
+      {!hasJoined && (
+        <JoinModal isOpen={isJoinOpen} onClose={() => setIsJoinOpen(false)} tournament={tournament} />
+      )}
     </>
   );
 }
