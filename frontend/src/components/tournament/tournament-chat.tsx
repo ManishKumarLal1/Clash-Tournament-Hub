@@ -1,11 +1,124 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Send, Image as ImageIcon } from 'lucide-react';
-import { Magnetic } from '@/components/animations/magnetic';
+import { useState, useEffect, useRef } from 'react';
+import { X, Send, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
-export function TournamentChat({ isOpen, onClose, title = 'Tournament Chat' }: { isOpen: boolean, onClose: () => void, title?: string }) {
-  const [message, setMessage] = useState('');
+interface ChatProps {
+  isOpen: boolean;
+  onClose: () => void;
+  tournamentId: string;
+  matchId?: string | null; // <-- Add | null here
+  title?: string;
+}
+
+export function TournamentChat({ isOpen, onClose, tournamentId, matchId, title = 'Tournament Chat' }: ChatProps) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+  
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const supabase = createClient();
+
+  // Scroll to bottom
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const initChat = async () => {
+      setIsLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Fetch profile to get username
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('username, display_name').eq('id', user.id).single();
+        setCurrentUser({ ...user, profile });
+      }
+
+      // Build query
+      let query = supabase
+        .from('messages')
+        .select(`*, profiles:user_id (username, display_name)`)
+        .eq('tournament_id', tournamentId)
+        .order('created_at', { ascending: true });
+
+      // Filter by match if it's a match chat
+      if (matchId) {
+        query = query.eq('match_id', matchId);
+      } else {
+        query = query.is('match_id', null);
+      }
+
+      const { data: history } = await query;
+      if (history) setMessages(history);
+      
+      setIsLoading(false);
+      setTimeout(scrollToBottom, 100);
+    };
+
+    initChat();
+
+    // Set up Realtime Subscription
+    const channel = supabase
+      .channel(`chat_${tournamentId}_${matchId || 'global'}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `tournament_id=eq.${tournamentId}`,
+        },
+        async (payload) => {
+          // Ensure the message belongs to this specific thread
+          if ((matchId && payload.new.match_id !== matchId) || (!matchId && payload.new.match_id !== null)) return;
+
+          // Fetch the profile of the sender to display their name
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username, display_name')
+            .eq('id', payload.new.user_id)
+            .single();
+
+          const newMsg = { ...payload.new, profiles: profile };
+          setMessages((prev) => [...prev, newMsg]);
+          setTimeout(scrollToBottom, 50);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isOpen, tournamentId, matchId, supabase]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !currentUser || isSending) return;
+
+    setIsSending(true);
+    const content = newMessage;
+    setNewMessage(''); // Optimistic clear
+
+    const { error } = await supabase.from('messages').insert({
+      tournament_id: tournamentId,
+      match_id: matchId || null,
+      user_id: currentUser.id,
+      content: content,
+    });
+
+    if (error) {
+      console.error(error);
+      setNewMessage(content); // Restore on error
+      alert('Failed to send message.');
+    }
+    setIsSending(false);
+  };
 
   return (
     <>
@@ -22,8 +135,8 @@ export function TournamentChat({ isOpen, onClose, title = 'Tournament Chat' }: {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10 bg-[#12121A]">
           <div>
-            <h2 className="font-display text-xl text-white">{title}</h2>
-            <p className="text-xs text-emerald-400">Live Hub</p>
+            <h2 className="font-display text-xl text-white truncate max-w-[250px]">{title}</h2>
+            <p className="text-xs text-emerald-400">Live Chat</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors text-[#A1A1AA] hover:text-white">
             <X className="w-5 h-5" />
@@ -31,52 +144,59 @@ export function TournamentChat({ isOpen, onClose, title = 'Tournament Chat' }: {
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* System Message */}
-          <div className="text-center">
-            <span className="text-xs text-[#A1A1AA] bg-white/5 px-3 py-1 rounded-full">Tournament Chat Started</span>
-          </div>
-
-          {/* Incoming Message */}
-          <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-gold to-yellow-200 flex-shrink-0" />
-            <div>
-              <p className="text-xs text-[#A1A1AA] mb-1">ClashKing <span className="text-[10px] opacity-50">10:42 AM</span></p>
-              <div className="bg-[#12121A] border border-white/5 p-3 rounded-2xl rounded-tl-none text-sm text-white">
-                I'm ready for the match! Let me know when you're online.
-              </div>
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+          {isLoading ? (
+             <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 text-gold animate-spin" /></div>
+          ) : messages.length === 0 ? (
+            <div className="text-center py-10">
+              <span className="text-xs text-[#A1A1AA] bg-white/5 px-3 py-1 rounded-full">No messages yet. Say hi!</span>
             </div>
-          </div>
-
-          {/* Outgoing Message */}
-          <div className="flex gap-3 flex-row-reverse">
-            <div className="w-8 h-8 rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center text-xs font-bold text-white">YOU</div>
-            <div className="text-right">
-              <p className="text-xs text-[#A1A1AA] mb-1"><span className="text-[10px] opacity-50">10:44 AM</span> You</p>
-              <div className="bg-gold text-[#0A0A0F] p-3 rounded-2xl rounded-tr-none text-sm font-medium text-left">
-                Give me 5 mins, just finishing a builder upgrade.
-              </div>
-            </div>
-          </div>
+          ) : (
+            messages.map((msg) => {
+              const isMe = msg.user_id === currentUser?.id;
+              const senderName = msg.profiles?.display_name || msg.profiles?.username || 'Unknown';
+              
+              return (
+                <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
+                  <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold ${isMe ? 'bg-gold text-black' : 'bg-white/10 text-white'}`}>
+                    {senderName.charAt(0).toUpperCase()}
+                  </div>
+                  <div className={`max-w-[75%] ${isMe ? 'text-right' : ''}`}>
+                    <p className="text-xs text-[#A1A1AA] mb-1">
+                      {isMe ? 'You' : `@${msg.profiles?.username || 'user'}`} • {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                    <div className={`p-3 rounded-2xl text-sm text-left ${isMe ? 'bg-gold text-black rounded-tr-none' : 'bg-[#12121A] border border-white/5 text-white rounded-tl-none'}`}>
+                      {msg.content}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Input Area */}
         <div className="p-4 border-t border-white/10 bg-[#12121A]">
-          <div className="flex items-center gap-2 bg-[#0A0A0F] border border-white/10 rounded-xl p-2 focus-within:border-gold/50 focus-within:ring-1 focus-within:ring-gold/50 transition-all">
-            <button className="p-2 text-[#A1A1AA] hover:text-white transition-colors" title="Upload Screenshot">
+          <form onSubmit={handleSendMessage} className="flex items-center gap-2 bg-[#0A0A0F] border border-white/10 rounded-xl p-2 focus-within:border-gold/50 focus-within:ring-1 focus-within:ring-gold/50 transition-all">
+            <button type="button" className="p-2 text-[#A1A1AA] hover:text-white transition-colors" title="Upload Screenshot (Coming Soon)">
               <ImageIcon className="w-5 h-5" />
             </button>
             <input 
               type="text" 
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Type a message..."
               className="flex-1 bg-transparent border-none text-sm text-white placeholder:text-white/30 focus:outline-none"
             />
-            <button className="p-2 bg-gold text-[#0A0A0F] rounded-lg hover:bg-[#F5C876] transition-colors">
-              <Send className="w-4 h-4" />
+            <button 
+              type="submit" 
+              disabled={!newMessage.trim() || isSending}
+              className="p-2 bg-gold text-[#0A0A0F] rounded-lg hover:bg-[#F5C876] transition-colors disabled:opacity-50"
+            >
+              {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
-          </div>
+          </form>
         </div>
       </div>
     </>

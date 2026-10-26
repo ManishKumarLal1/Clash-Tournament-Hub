@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables (CRITICAL: Contains your Supercell API Key)
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
