@@ -70,9 +70,19 @@ export default function TournamentDetailPage() {
     if (participantsData) {
       setParticipants(participantsData);
       
-      // Check if current user is already in the list
+      // Check if current user is already in the list (Works for both 1v1 and Clan vs Clan)
       if (user) {
-        const userJoined = participantsData.some(p => p.user_id === user.id);
+        const userJoined = participantsData.some((p) => {
+          // Check if they are the captain / 1v1 player
+          if (p.user_id === user.id) return true;
+          
+          // Check if they are inside the team's roster_data
+          if (p.roster_data && Array.isArray(p.roster_data)) {
+            return p.roster_data.some((member: any) => member.userId === user.id);
+          }
+          
+          return false;
+        });
         setHasJoined(userJoined);
       }
     }
@@ -84,7 +94,7 @@ export default function TournamentDetailPage() {
     fetchTournamentAndParticipants();
   }, [slug, supabase]);
 
-    const handleStartTournament = async () => {
+  const handleStartTournament = async () => {
     if (!confirm("Are you sure? This will lock registration and generate the bracket.")) return;
     setIsStarting(true);
 

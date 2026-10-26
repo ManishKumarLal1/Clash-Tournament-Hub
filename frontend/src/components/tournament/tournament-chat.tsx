@@ -3,12 +3,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Send, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { CldUploadWidget } from 'next-cloudinary';
+
+// 1. Initialize Supabase OUTSIDE the component so the connection isn't rebuilt on every render
+const supabase = createClient();
 
 interface ChatProps {
   isOpen: boolean;
   onClose: () => void;
   tournamentId: string;
-  matchId?: string | null; // <-- Add | null here
+  matchId?: string | null; // Accepts null for global chat
   title?: string;
 }
 
@@ -20,7 +24,6 @@ export function TournamentChat({ isOpen, onClose, tournamentId, matchId, title =
   const [isSending, setIsSending] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
 
   // Scroll to bottom
   const scrollToBottom = () => {
@@ -34,7 +37,6 @@ export function TournamentChat({ isOpen, onClose, tournamentId, matchId, title =
       setIsLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Fetch profile to get username
       if (user) {
         const { data: profile } = await supabase.from('profiles').select('username, display_name').eq('id', user.id).single();
         setCurrentUser({ ...user, profile });
@@ -85,8 +87,14 @@ export function TournamentChat({ isOpen, onClose, tournamentId, matchId, title =
             .eq('id', payload.new.user_id)
             .single();
 
-          const newMsg = { ...payload.new, profiles: profile };
-          setMessages((prev) => [...prev, newMsg]);
+          const newMsg: any = { ...payload.new, profiles: profile };
+          
+          setMessages((prev) => {
+            // Prevent duplicates if the user sent it (optimistic UI handles sender)
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+          
           setTimeout(scrollToBottom, 50);
         }
       )
@@ -95,7 +103,7 @@ export function TournamentChat({ isOpen, onClose, tournamentId, matchId, title =
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isOpen, tournamentId, matchId, supabase]);
+  }, [isOpen, tournamentId, matchId]); // 2. Removed `supabase` from here to prevent disconnects!
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,8 +173,20 @@ export function TournamentChat({ isOpen, onClose, tournamentId, matchId, title =
                     <p className="text-xs text-[#A1A1AA] mb-1">
                       {isMe ? 'You' : `@${msg.profiles?.username || 'user'}`} • {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
-                    <div className={`p-3 rounded-2xl text-sm text-left ${isMe ? 'bg-gold text-black rounded-tr-none' : 'bg-[#12121A] border border-white/5 text-white rounded-tl-none'}`}>
-                      {msg.content}
+                    
+                    <div className={`p-3 rounded-2xl text-sm text-left flex flex-col gap-2 ${isMe ? 'bg-gold text-black rounded-tr-none' : 'bg-[#12121A] border border-white/5 text-white rounded-tl-none'}`}>
+                      {/* Render Image if exists */}
+                      {msg.image_url && (
+                        <img 
+                          src={msg.image_url} 
+                          alt="Attachment" 
+                          className="rounded-lg max-w-full h-auto object-cover border border-black/10" 
+                          loading="lazy"
+                        />
+                      )}
+                      
+                      {/* Render Text if exists */}
+                      {msg.content && <p>{msg.content}</p>}
                     </div>
                   </div>
                 </div>
@@ -179,9 +199,41 @@ export function TournamentChat({ isOpen, onClose, tournamentId, matchId, title =
         {/* Input Area */}
         <div className="p-4 border-t border-white/10 bg-[#12121A]">
           <form onSubmit={handleSendMessage} className="flex items-center gap-2 bg-[#0A0A0F] border border-white/10 rounded-xl p-2 focus-within:border-gold/50 focus-within:ring-1 focus-within:ring-gold/50 transition-all">
-            <button type="button" className="p-2 text-[#A1A1AA] hover:text-white transition-colors" title="Upload Screenshot (Coming Soon)">
-              <ImageIcon className="w-5 h-5" />
-            </button>
+            
+            {/* Cloudinary Integration */}
+            <CldUploadWidget 
+              uploadPreset={process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET}
+              onSuccess={async (result: any) => {
+                const imageUrl = result.info.secure_url;
+                
+                if (currentUser) {
+                  const { error } = await supabase.from('messages').insert({
+                    tournament_id: tournamentId,
+                    match_id: matchId || null,
+                    user_id: currentUser.id,
+                    content: '', 
+                    image_url: imageUrl,
+                  });
+                  
+                  if (error) {
+                    alert("Error saving image to database: " + error.message);
+                    console.error(error);
+                  }
+                }
+              }}
+            >
+              {({ open }) => (
+                <button 
+                  type="button" 
+                  onClick={() => open()}
+                  className="p-2 text-[#A1A1AA] hover:text-gold transition-colors" 
+                  title="Upload Image"
+                >
+                  <ImageIcon className="w-5 h-5" />
+                </button>
+              )}
+            </CldUploadWidget>
+
             <input 
               type="text" 
               value={newMessage}

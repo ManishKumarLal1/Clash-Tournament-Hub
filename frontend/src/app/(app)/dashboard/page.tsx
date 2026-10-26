@@ -72,7 +72,7 @@ export default function DashboardPage() {
     fetchDashboardData();
   }, []);
 
-  const handleInviteAction = async (invite: any, action: 'accepted' | 'declined') => {
+    const handleInviteAction = async (invite: any, action: 'accepted' | 'declined') => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -91,6 +91,7 @@ export default function DashboardPage() {
         .update({ roster_data: updatedRoster })
         .eq('id', invite.id);
 
+      // Throw the error if Supabase blocks it
       if (error) throw error;
 
       // 3. Update local UI state (remove the invite from the list)
