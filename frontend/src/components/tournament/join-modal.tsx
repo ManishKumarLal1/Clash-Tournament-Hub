@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Users, Swords, Loader2 } from 'lucide-react';
+import { X, Users, Swords, Loader2, ShieldAlert } from 'lucide-react';
 import { Magnetic } from '@/components/animations/magnetic';
 import { RosterBuilder } from './roster-builder';
 import { createClient } from '@/lib/supabase/client';
@@ -35,13 +35,21 @@ export function JoinModal({ isOpen, onClose, tournament }: { isOpen: boolean, on
         .select('*')
         .eq('user_id', user.id);
       
-      if (data && data.length > 0) {
+      if (data) {
         setAccounts(data);
-        setSelectedAccount(data[0].id);
+        // Auto-select the first ELIGIBLE account (if any)
+        const firstEligible = data.find(acc => 
+          tournament.type !== '1v1' || 
+          !tournament.thRestriction || 
+          acc.th_level === tournament.thRestriction
+        );
+        if (firstEligible) {
+          setSelectedAccount(firstEligible.id);
+        }
       }
     };
     fetchAccounts();
-  }, [isOpen, supabase]);
+  }, [isOpen, supabase, tournament]);
 
   const handleJoin = async () => {
     setIsSubmitting(true);
@@ -53,8 +61,15 @@ export function JoinModal({ isOpen, onClose, tournament }: { isOpen: boolean, on
 
       if (tournament.type === '1v1') {
         if (!selectedAccount) throw new Error("Please select an account to join with.");
+        
         const account = accounts.find(a => a.id === selectedAccount);
 
+        // --- VALIDATION LOGIC ---
+        if (tournament.thRestriction && account.th_level !== tournament.thRestriction) {
+          throw new Error(`This tournament is restricted to Town Hall ${tournament.thRestriction}. Your account is TH${account.th_level}.`);
+        }
+
+        // Save to database
         const { error: dbError } = await supabase.from('participants').insert({
           tournament_id: tournament.id,
           user_id: user.id,
@@ -75,9 +90,9 @@ export function JoinModal({ isOpen, onClose, tournament }: { isOpen: boolean, on
         const { error: dbError } = await supabase.from('participants').insert({
           tournament_id: tournament.id,
           user_id: user.id,
-          player_tag: teamData.clanTag, // Use Clan Tag as the main identifier
+          player_tag: teamData.clanTag, 
           player_name: teamData.clanName,
-          th_level: 0, // Teams don't have a single TH
+          th_level: 0, 
           team_name: teamData.clanName,
           team_tag: teamData.clanTag,
           roster_data: teamData.roster,
@@ -89,7 +104,6 @@ export function JoinModal({ isOpen, onClose, tournament }: { isOpen: boolean, on
         }
       }
 
-      alert("Successfully registered!");
       onClose();
       router.refresh(); 
     } catch (err: any) {
@@ -101,8 +115,7 @@ export function JoinModal({ isOpen, onClose, tournament }: { isOpen: boolean, on
 
   if (!isOpen) return null;
 
-  // Check if we can submit
-  const canSubmit1v1 = accounts.length > 0 && selectedAccount !== '';
+  const canSubmit1v1 = accounts.length > 0 && selectedAccount !== '' && !error;
   const canSubmitClan = teamData.clanName && teamData.clanTag && teamData.roster.length === (tournament.thRequirements?.length || 0);
   const isButtonDisabled = isSubmitting || (tournament.type === '1v1' ? !canSubmit1v1 : !canSubmitClan);
 
@@ -123,41 +136,67 @@ export function JoinModal({ isOpen, onClose, tournament }: { isOpen: boolean, on
 
         <div className="p-6">
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg mb-4 text-center">
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg mb-4 flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 flex-shrink-0" />
               {error}
             </div>
           )}
 
           {tournament.type === 'clan_vs_clan' ? (
              <RosterBuilder 
-  tournamentId={tournament.id}
-  requirements={tournament.thRequirements || []} 
-  onRosterChange={setTeamData}
-/>
+               tournamentId={tournament.id}
+               requirements={tournament.thRequirements || []} 
+               onRosterChange={setTeamData}
+             />
           ) : (
             <div className="space-y-4">
               <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex gap-3 text-sm text-white">
                 <Swords className="w-5 h-5 text-gold flex-shrink-0" />
-                <p>Select the account you want to use for this 1v1 tournament.</p>
+                <div>
+                  <p>Select the account you want to use.</p>
+                  {tournament.thRestriction && (
+                    <p className="text-gold mt-1 font-medium">Requires Town Hall {tournament.thRestriction}</p>
+                  )}
+                </div>
               </div>
               
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
                 {accounts.length === 0 ? (
                    <p className="text-sm text-[#A1A1AA] text-center py-4">No linked accounts found. Go to your Profile to link an account first.</p>
                 ) : (
-                  accounts.map((acc) => (
-                    <div 
-                      key={acc.id}
-                      onClick={() => setSelectedAccount(acc.id)}
-                      className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${selectedAccount === acc.id ? 'border-gold/50 bg-gold/5' : 'border-white/10 hover:border-white/20'}`}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-gold to-yellow-200 flex items-center justify-center font-bold text-black">L</div>
-                      <div>
-                        <p className="text-sm font-medium text-white">{acc.player_name}</p>
-                        <p className="text-xs text-[#A1A1AA] font-mono">{acc.player_tag} • TH{acc.th_level}</p>
+                  accounts.map((acc) => {
+                    const isEligible = !tournament.thRestriction || acc.th_level === tournament.thRestriction;
+                    
+                    return (
+                      <div 
+                        key={acc.id}
+                        onClick={() => {
+                          if (isEligible) {
+                            setSelectedAccount(acc.id);
+                            setError(''); // Clear errors when selecting a valid account
+                          }
+                        }}
+                        className={`flex items-center gap-3 p-3 border rounded-lg transition-colors ${
+                          !isEligible ? 'opacity-50 cursor-not-allowed border-white/5 bg-black/20' : 
+                          selectedAccount === acc.id ? 'border-gold/50 bg-gold/5 cursor-pointer' : 
+                          'border-white/10 hover:border-white/20 cursor-pointer'
+                        }`}
+                      >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${isEligible ? 'bg-gradient-to-tr from-gold to-yellow-200 text-black' : 'bg-white/10 text-white'}`}>
+                          {acc.player_name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-white">{acc.player_name}</p>
+                          <p className="text-xs text-[#A1A1AA] font-mono">{acc.player_tag} • TH{acc.th_level}</p>
+                        </div>
+                        {!isEligible && (
+                          <span className="text-xs font-medium text-red-400 bg-red-400/10 px-2 py-1 rounded border border-red-400/20">
+                            Ineligible
+                          </span>
+                        )}
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>

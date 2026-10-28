@@ -146,7 +146,7 @@ export default function CreateTournamentPage() {
             </select>
           </div>
           
-          {tournamentType === '1v1' && (
+                    {tournamentType === '1v1' && (
             <>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-white">Max Players</label>
@@ -154,16 +154,21 @@ export default function CreateTournamentPage() {
                   <option value="8">8 Players</option>
                   <option value="16">16 Players</option>
                   <option value="32">32 Players</option>
+                  <option value="64">64 Players (Round of 64)</option>
+                  <option value="128">128 Players (Round of 128)</option>
+                  <option value="256">256 Players (Round of 256)</option>
+                  <option value="9999">Open for All</option>
                 </select>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-white">Town Hall Restriction</label>
                 <select name="thRestriction" value={formData.thRestriction} onChange={handleChange} className="w-full bg-[#0A0A0F] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-gold/50 appearance-none">
-                  <option value="18">Town Hall 18 Only</option>
-                  <option value="17">Town Hall 17 Only</option>
-                  <option value="16">Town Hall 16 Only</option>
-                  <option value="15">Town Hall 15 Only</option>
-                  <option value="14">Town Hall 14 Only</option>
+                  {/* Generate options from TH19 down to TH2 */}
+                  {Array.from({ length: 18 }, (_, i) => 19 - i).map((level) => (
+                    <option key={level} value={level}>
+                      Town Hall {level} Only
+                    </option>
+                  ))}
                 </select>
               </div>
             </>

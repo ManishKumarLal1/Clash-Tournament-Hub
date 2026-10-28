@@ -72,7 +72,7 @@ export default function ProfilePage() {
   }, [supabase]);
 
   // 2. Handle linking a new account
-    const handleLinkAccount = async (e: React.FormEvent) => {
+      const handleLinkAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError('');
@@ -86,8 +86,9 @@ export default function ProfilePage() {
     const formattedTag = playerTag.toUpperCase();
 
     try {
-      // 1. Call your local backend proxy to verify the token!
-      const response = await fetch('http://localhost:3001/api/verify-player', {
+      // 1. Call your backend proxy to verify the token
+            // 1. Call your backend proxy to verify the token
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/verify-player`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tag: formattedTag, token: apiToken })
@@ -102,11 +103,10 @@ export default function ProfilePage() {
       // 2. The proxy verified it and returned the real player data!
       const { name, townHallLevel } = result.player;
 
-      // 3. Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // 4. Save to database
+      // 3. Save to database
       const { data, error: dbError } = await supabase
         .from('linked_accounts')
         .insert({
@@ -114,6 +114,7 @@ export default function ProfilePage() {
           player_tag: formattedTag,
           player_name: name, // Real name from API
           th_level: townHallLevel, // Real TH from API
+          is_verified: true // Mark as verified
         })
         .select()
         .single();

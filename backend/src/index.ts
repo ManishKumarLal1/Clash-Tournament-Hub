@@ -86,7 +86,10 @@ app.post('/api/verify-player', async (req, res) => {
 });
 
 // Start Server
+// Start Server
+// Start Server
 const PORT = process.env.PORT || 3001;
+
 app.listen(PORT, () => {
   console.log(`🚀 Clash API Proxy running on http://localhost:${PORT}`);
 });

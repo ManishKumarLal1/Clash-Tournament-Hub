@@ -26,7 +26,7 @@ export function RosterBuilder({ tournamentId, requirements = [], onRosterChange 
     onRosterChange({ clanName: newName, clanTag: newTag, roster: newRoster });
   };
 
-    const handleAddMember = async () => {
+      const handleAddMember = async () => {
     setError('');
     if (!inputTag.startsWith('#')) {
       setError('Player tag must start with #');
@@ -49,8 +49,8 @@ export function RosterBuilder({ tournamentId, requirements = [], onRosterChange 
     }
 
     try {
-      // 1. Fetch real-time player data from your backend proxy
-      const res = await fetch(`http://localhost:3001/api/player?tag=${encodeURIComponent(formattedTag)}`);
+      // 1. Fetch live player data from your backend proxy
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/player?tag=${encodeURIComponent(formattedTag)}`);
       const result = await res.json();
 
       if (!result.success) {
@@ -76,7 +76,7 @@ export function RosterBuilder({ tournamentId, requirements = [], onRosterChange 
         throw new Error('Player is not registered on ClashHub. They must link this account first.');
       }
 
-      // 4. Check for duplicate joining (prevent same user in two clans for this tournament)
+      // 4. Check for duplicate joining
       const { data: existingEntry } = await supabase
         .from('participants')
         .select('id')
@@ -93,7 +93,7 @@ export function RosterBuilder({ tournamentId, requirements = [], onRosterChange 
         tag: formattedTag, 
         th: liveTH.toString(), 
         userId: linkedAccount.user_id,
-        username: linkedAccount.profiles.username,
+        username: linkedAccount.profiles?.username || 'unknown',
         status: 'pending' 
       }];
       
