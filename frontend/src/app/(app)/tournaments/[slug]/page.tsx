@@ -330,9 +330,13 @@ export default function TournamentDetailPage() {
       </div>
       
       {/* BRACKET SECTION (Only show if Ongoing) */}
-      {tournament.status === 'Ongoing' && (
+            {tournament.status === 'Ongoing' && (
         <div className="mt-16 border-t border-white/10 pt-16">
-          <BracketView tournamentId={tournament.id} isHost={isHost} />
+          <BracketView 
+            tournamentId={tournament.id} 
+            isHost={isHost} 
+            tournamentType={tournament.type} // <-- ADD THIS LINE
+          />
         </div>
       )}
 
