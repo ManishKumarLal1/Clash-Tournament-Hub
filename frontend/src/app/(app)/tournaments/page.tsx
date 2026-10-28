@@ -22,7 +22,8 @@ export default function TournamentsPage() {
         .from('tournaments')
         .select(`
           *,
-          profiles:host_id (display_name)
+          profiles:host_id (display_name),
+          participants (count)
         `)
         .order('created_at', { ascending: false });
 
@@ -31,7 +32,8 @@ export default function TournamentsPage() {
           ...t,
           joinCode: t.join_code,
           maxPlayers: t.max_players,
-          currentPlayers: t.current_players,
+          // DYNAMIC COUNT HERE:
+          currentPlayers: t.participants?.[0]?.count || 0,
           startDate: t.start_date,
           host: t.profiles?.display_name || 'Unknown Host'
         }));

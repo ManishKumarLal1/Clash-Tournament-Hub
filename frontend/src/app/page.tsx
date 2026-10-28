@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Loader2, Trophy, Newspaper, Twitter } from 'lucide-react';
 import Link from 'next/link';
 
-// MOCK DATA for Esports News (Since X/Twitter API is complex for MVP)
+// MOCK DATA for Esports News
 const ESPORTS_NEWS = [
   {
     id: 1,
@@ -51,7 +51,11 @@ export default function HomePage() {
     const fetchTournaments = async () => {
       const { data } = await supabase
         .from('tournaments')
-        .select(`*, profiles:host_id (display_name)`)
+        .select(`
+          *,
+          profiles:host_id (display_name),
+          participants (count)
+        `)
         .in('status', ['Registering', 'Ongoing'])
         .order('created_at', { ascending: false })
         .limit(3);
@@ -61,6 +65,8 @@ export default function HomePage() {
           ...t,
           joinCode: t.join_code,
           maxPlayers: t.max_players,
+          // DYNAMIC COUNT HERE:
+          currentPlayers: t.participants?.[0]?.count || 0,
           startDate: t.start_date,
           host: t.profiles?.display_name || 'Unknown Host'
         })));

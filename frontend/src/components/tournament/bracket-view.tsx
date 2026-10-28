@@ -4,14 +4,19 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { MessageSquare, Crown, Loader2, RefreshCw } from 'lucide-react';
 import { TournamentChat } from './tournament-chat';
+import { WarStatsModal } from './war-stats-modal'; // <-- Import the new modal
 
-export function BracketView({ tournamentId, isHost }: { tournamentId: string, isHost: boolean }) {
+export function BracketView({ tournamentId, isHost, tournamentType }: { tournamentId: string, isHost: boolean, tournamentType: string }) {
   const [matches, setMatches] = useState<any[]>([]);
   const [participants, setParticipants] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatTitle, setChatTitle] = useState('Match Chat');
-    const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
+  const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
+
+  // War Stats Modal State
+  const [selectedWarMatch, setSelectedWarMatch] = useState<any>(null);
+  const [isWarModalOpen, setIsWarModalOpen] = useState(false);
 
   const supabase = createClient();
 
@@ -35,8 +40,10 @@ export function BracketView({ tournamentId, isHost }: { tournamentId: string, is
   const handleAdvanceWinner = async (match: any, winnerId: string, loserId: string | null) => {
     if (!isHost) return;
     
-    // 1. Complete current match
-    await supabase.from('matches').update({ winner_id: winnerId, status: 'completed' }).eq('id', match.id);
+    // 1. Complete current match (already updated by handleReportWar for CvC, but kept for 1v1)
+    if (tournamentType === '1v1') {
+      await supabase.from('matches').update({ winner_id: winnerId, status: 'completed' }).eq('id', match.id);
+    }
 
     // 2. Route Winner (Standard Brackets)
     if (match.next_winner_match_id) {
@@ -60,14 +67,11 @@ export function BracketView({ tournamentId, isHost }: { tournamentId: string, is
 
     // 4. Handle Grand Final Reset Logic
     if (match.bracket_type === 'grand_final' && match.match_index === 0) {
-      // If the Losers Bracket team (p2) wins GF1, we need a reset match.
       if (winnerId === match.p2_id) {
         const resetMatch = matches.find(m => m.bracket_type === 'grand_final' && m.match_index === 1);
         if (resetMatch) {
           await supabase.from('matches').update({
-            p1_id: match.p1_id, // WB Team
-            p2_id: match.p2_id, // LB Team
-            status: 'ready'
+            p1_id: match.p1_id, p2_id: match.p2_id, status: 'ready'
           }).eq('id', resetMatch.id);
         }
       }
@@ -76,18 +80,66 @@ export function BracketView({ tournamentId, isHost }: { tournamentId: string, is
     fetchBracket();
   };
 
+  // --- NEW: CvC Winner Calculation ---
+  const handleReportWar = async (warData: any) => {
+    if (!selectedWarMatch) return;
+
+    // Calculate Winner based on Stars, then Destruction %
+    let winnerId = null;
+    if (warData.team1.stars > warData.team2.stars) {
+      winnerId = selectedWarMatch.p1_id;
+    } else if (warData.team2.stars > warData.team1.stars) {
+      winnerId = selectedWarMatch.p2_id;
+    } else {
+      // Tie on stars, check destruction
+      if (warData.team1.destruction > warData.team2.destruction) {
+        winnerId = selectedWarMatch.p1_id;
+      } else if (warData.team2.destruction > warData.team1.destruction) {
+        winnerId = selectedWarMatch.p2_id;
+      } else {
+        alert("It's a perfect tie! You must manually select a winner.");
+        return;
+      }
+    }
+
+    // Save stats and winner
+    await supabase.from('matches').update({ 
+      match_data: warData,
+      winner_id: winnerId,
+      status: 'completed' 
+    }).eq('id', selectedWarMatch.id);
+
+    const loserId = selectedWarMatch.p1_id === winnerId ? selectedWarMatch.p2_id : selectedWarMatch.p1_id;
+    await handleAdvanceWinner(selectedWarMatch, winnerId, loserId);
+
+    setIsWarModalOpen(false);
+    setSelectedWarMatch(null);
+  };
+
   const renderMatchCard = (match: any) => {
     if (!match) return null;
     const isResetMatch = match.bracket_type === 'grand_final' && match.match_index === 1;
-    
+    const stats = match.match_data; // Read the saved stats
+
+    const handlePlayerClick = (playerId: string | null, opponentId: string | null) => {
+      if (!isHost || match.winner_id || !playerId || !opponentId) return;
+
+      if (tournamentType === 'clan_vs_clan') {
+        setSelectedWarMatch(match);
+        setIsWarModalOpen(true);
+      } else {
+        handleAdvanceWinner(match, playerId, opponentId);
+      }
+    };
+
     return (
       <div key={match.id} className={`relative group w-64 border rounded-xl overflow-hidden transition-all ${isResetMatch ? 'border-gold/50 shadow-[0_0_15px_rgba(232,182,90,0.2)]' : 'border-white/5 bg-[#12121A] hover:border-gold/30'}`}>
         {isResetMatch && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-gold to-transparent" />}
         
-                <button 
+        <button 
           onClick={() => { 
             setChatTitle(`${getPlayerName(match.p1_id)} vs ${getPlayerName(match.p2_id)}`); 
-            setActiveMatchId(match.id); // <-- Set the specific match ID
+            setActiveMatchId(match.id);
             setIsChatOpen(true); 
           }} 
           className="absolute right-2 top-2 p-1.5 bg-white/5 rounded-md text-[#A1A1AA] hover:text-gold hover:bg-white/10 transition-colors z-10"
@@ -96,19 +148,40 @@ export function BracketView({ tournamentId, isHost }: { tournamentId: string, is
         </button>
         
         <div className="flex flex-col">
+          {/* Player 1 Row */}
           <div 
-            onClick={() => match.p1_id && match.p2_id && !match.winner_id && isHost && handleAdvanceWinner(match, match.p1_id, match.p2_id)}
-            className={`flex items-center justify-between p-3 border-b border-white/5 ${match.p1_id && match.p2_id && isHost && !match.winner_id ? 'cursor-pointer hover:bg-white/5' : ''} ${match.winner_id === match.p1_id ? 'bg-gold/10' : ''}`}
+            onClick={() => handlePlayerClick(match.p1_id, match.p2_id)}
+            className={`flex items-center justify-between p-3 border-b border-white/5 ${isHost && !match.winner_id && match.p1_id ? 'cursor-pointer hover:bg-white/5' : ''} ${match.winner_id === match.p1_id ? 'bg-gold/10' : ''}`}
           >
-            <span className={`text-sm font-medium ${match.winner_id === match.p1_id ? 'text-gold' : 'text-white'}`}>{getPlayerName(match.p1_id)}</span>
-            {match.winner_id === match.p1_id && <Crown className="w-4 h-4 text-gold" />}
+            <div className="flex flex-col overflow-hidden">
+              <span className={`text-sm font-medium truncate ${match.winner_id === match.p1_id ? 'text-gold' : 'text-white'}`}>
+                {getPlayerName(match.p1_id)}
+              </span>
+              {stats && (
+                <span className="text-[10px] text-[#A1A1AA] mt-0.5">
+                  {stats.team1.stars}★ {stats.team1.destruction}%
+                </span>
+              )}
+            </div>
+            {match.winner_id === match.p1_id && <Crown className="w-4 h-4 text-gold flex-shrink-0" />}
           </div>
+
+          {/* Player 2 Row */}
           <div 
-            onClick={() => match.p1_id && match.p2_id && !match.winner_id && isHost && handleAdvanceWinner(match, match.p2_id, match.p1_id)}
-            className={`flex items-center justify-between p-3 ${match.p1_id && match.p2_id && isHost && !match.winner_id ? 'cursor-pointer hover:bg-white/5' : ''} ${match.winner_id === match.p2_id ? 'bg-gold/10' : ''}`}
+            onClick={() => handlePlayerClick(match.p2_id, match.p1_id)}
+            className={`flex items-center justify-between p-3 ${isHost && !match.winner_id && match.p2_id ? 'cursor-pointer hover:bg-white/5' : ''} ${match.winner_id === match.p2_id ? 'bg-gold/10' : ''}`}
           >
-            <span className={`text-sm font-medium ${match.winner_id === match.p2_id ? 'text-gold' : 'text-white'}`}>{getPlayerName(match.p2_id)}</span>
-            {match.winner_id === match.p2_id && <Crown className="w-4 h-4 text-gold" />}
+            <div className="flex flex-col overflow-hidden">
+              <span className={`text-sm font-medium truncate ${match.winner_id === match.p2_id ? 'text-gold' : 'text-white'}`}>
+                {getPlayerName(match.p2_id)}
+              </span>
+              {stats && (
+                <span className="text-[10px] text-[#A1A1AA] mt-0.5">
+                  {stats.team2.stars}★ {stats.team2.destruction}%
+                </span>
+              )}
+            </div>
+            {match.winner_id === match.p2_id && <Crown className="w-4 h-4 text-gold flex-shrink-0" />}
           </div>
         </div>
       </div>
@@ -123,9 +196,6 @@ export function BracketView({ tournamentId, isHost }: { tournamentId: string, is
   const gf1 = matches.find(m => m.bracket_type === 'grand_final' && m.match_index === 0);
   const gf2 = matches.find(m => m.bracket_type === 'grand_final' && m.match_index === 1);
 
-  // Champion Logic: 
-  // If GF1 is won by the WB team (p1), they are champion. 
-  // If GF1 is won by the LB team (p2), GF2 must be played, and the winner of GF2 is champion.
   let championId = null;
   if (gf2?.winner_id) {
     championId = gf2.winner_id;
@@ -207,12 +277,19 @@ export function BracketView({ tournamentId, isHost }: { tournamentId: string, is
         </div>
       )}
 
-            <TournamentChat 
+      <TournamentChat 
         isOpen={isChatOpen} 
         onClose={() => setIsChatOpen(false)} 
         tournamentId={tournamentId}
-        matchId={activeMatchId} // <-- We need to track which match is active
+        matchId={activeMatchId}
         title={chatTitle} 
+      />
+
+      <WarStatsModal 
+        isOpen={isWarModalOpen}
+        onClose={() => setIsWarModalOpen(false)}
+        match={selectedWarMatch}
+        onSubmit={handleReportWar}
       />
     </div>
   );
