@@ -37,7 +37,7 @@ export function TournamentActions({ tournament, hasJoined }: { tournament: any, 
         )}
       </div>
 
-      // Find the TournamentChat component at the bottom:
+      
 <TournamentChat 
   isOpen={isChatOpen} 
   onClose={() => setIsChatOpen(false)} 

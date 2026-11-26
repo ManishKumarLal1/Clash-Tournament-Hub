@@ -206,7 +206,7 @@ export default function CreateTournamentPage() {
                   <div key={index} className="space-y-1">
                     <span className="text-[10px] text-[#A1A1AA] text-center block uppercase tracking-wider">Slot {index + 1}</span>
                     <select value={th} onChange={(e) => handleThChange(index, e.target.value)} className="w-full bg-[#0A0A0F] border border-white/10 rounded-lg px-2 py-2 text-center text-white focus:outline-none focus:border-gold/50 appearance-none text-sm">
-                      {[18, 17, 16, 15, 14, 13, 12].map(level => (
+                      {[19,18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(level => (
                         <option key={level} value={level}>TH{level}</option>
                       ))}
                     </select>
